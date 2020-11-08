@@ -9,13 +9,13 @@ Original file is located at
 
 # Commented out IPython magic to ensure Python compatibility.
 # %run ../input/python-recipes/dhtml.py
+# %run ../input/python-recipes/keras_history_plot.py
 dhtml('Code Modules & Settings','#00ff66',f3,fs7)
 
 !pip install mplcyberpunk
 
-import os,h5py,mplcyberpunk,seaborn as sn
-import pandas as pd,numpy as np
-import tensorflow as tf,pylab as pl
+import os,h5py,seaborn as sn,pylab as pl
+import pandas as pd,numpy as np,tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras import layers as tkl
 from tensorflow.keras import callbacks as tkc
@@ -25,14 +25,17 @@ dhtml('Functions','#00ff66',f3,fs7)
 
 def randi(nmin,nmax): 
     return np.random.randint(nmin,nmax)
+
 def randch(a): 
     return np.random.choice(a,1)[0]
+
 def randcoef():
     a=(.5+.1**6*randi(1,999999))\
       *randch([-1,1])
     b=randi(3,10)
     c=.1**3*randi(1,99)*randch([-1,1])
     return a,b,c
+
 def randcoord(a,b,c):
     t=np.arange(0,16*b*np.pi,1/(1440*b))
     fx=np.sin(t/6)+\
@@ -42,6 +45,7 @@ def randcoord(a,b,c):
        a*np.sin(b*t)*np.sin(t)-\
        c*np.cos(16*b*t)
     return fx,fy
+
 def randcol():
     return [np.random.random(3)]
 
@@ -71,26 +75,42 @@ def cb(fw):
                        patience=5,factor=.8)
     return [checkpointer,early_stopping,lr_reduction]
 
-def glow_history_plot(fit_history):
-    pl.figure(figsize=(10,10))
-    pl.subplot(211)
-    keys=list(fit_history.history.keys())[0:4]
+def module_exists(module_name):
+    try:
+        __import__(module_name)
+    except ImportError:
+        return False
+    else:
+        return True
+    
+def glow_history_plot(fit_history,fig_size=10,
+                      col1='#00ff66',col2='#6600ff'):
+    if module_exists('mplcyberpunk'):
+        import mplcyberpunk
+    
+    pl.figure(figsize=(fig_size,int(1.5*fig_size)))
+    pl.subplot(311)
+    keys=list(fit_history.history.keys())
     pl.plot(fit_history.history[keys[0]],
-            color='#00ff66',label='train')
+            color=col1,label='train')
     pl.plot(fit_history.history[keys[2]],
-            color='#6600ff',label='valid')
+            color=col2,label='valid')
     pl.xlabel('epochs'); pl.ylabel(keys[0])
-    pl.legend(); pl.grid()
-    pl.title('Loss')
-    mplcyberpunk.add_glow_effects()
-    pl.subplot(212)
+    pl.legend(); pl.title('loss')
+    mplcyberpunk.add_glow_effects()    
+    pl.subplot(312)
     pl.plot(fit_history.history[keys[1]],
-            color='#00ff66',label='train')
+            color=col1,label='train')
     pl.plot(fit_history.history[keys[3]],
-            color='#6600ff',label='valid')
+            color=col2,label='valid')
     pl.xlabel('epochs'); pl.ylabel(keys[1])    
-    pl.legend(); pl.grid()
-    pl.title('Accuracy')
+    pl.legend(); pl.title('accuracy')
+    mplcyberpunk.add_glow_effects()
+    pl.subplot(313)
+    pl.plot(fit_history.history[keys[4]],
+            color=col1,label='lr')
+    pl.xlabel('epochs'); pl.ylabel(keys[4])    
+    pl.legend(); pl.title('learning rate')
     mplcyberpunk.add_glow_effects(); pl.show()
 
 dhtml('Data','#00ff66',f3,fs7)
@@ -170,6 +190,11 @@ history=cnn_model\
      callbacks=cb(fw))
 
 glow_history_plot(history)
+
+keras_history_plot(history,start=50,end=200)
+
+df_history=pandas_history(history,True)
+df_history.head()
 
 cnn_model.load_weights(fw)
 cnn_model.evaluate(x_test,y_test)
