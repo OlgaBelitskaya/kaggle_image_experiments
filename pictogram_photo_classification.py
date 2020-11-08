@@ -8,314 +8,385 @@ Original file is located at
 """
 
 # Commented out IPython magic to ensure Python compatibility.
-from IPython.display import display,HTML
-def dhtml(str):
-    display(HTML("""<style>
-    @import 'https://fonts.googleapis.com/css?family=Smokum&effect=3d';      
-    </style><h1 class='font-effect-3d' 
-    style='font-family:Smokum; color:#ee6611; font-size:35px;'>
-#     %s</h1>"""%str))
+# %run ../input/python-recipes/dhtml.py
+dhtml('File Writing')
 
-dhtml('Code Modules, Functions, & Settings')
+# Commented out IPython magic to ensure Python compatibility.
+# %%writefile pictogram_photo_classify.py
+# import pandas as pd,numpy as np,tensorflow as tf
+# import os,seaborn as sn,pylab as pl
+# from IPython.display import display
+# from tensorflow.keras.preprocessing \
+# import image as tkimg
+# from tensorflow.keras.datasets import cifar10
+# from IPython.core.magic import register_line_magic
+# import tensorflow_hub as th
+# from tensorflow.keras.models import Sequential
+# from tensorflow.keras import layers as tkl
+# from tensorflow.keras import callbacks as tkc
+# 
+# img_size1,img_size2=32,96
+# cmap1,cmap2='spring','autumn'
+# fw='weights.best.hdf5'
+# names1=[['pictogram','contour','sketch'],
+#         ['flower','bird','butterfly','tree',
+#          'plane','crane','dog','horse',
+#          'deer','truck','car','cat',
+#          'frog','ship','fish','house']]
+# names2=[['plane','car','bird','cat','deer',
+#          'dog','frog','horse','ship','truck']]
+# 
+# def images2array(files_path,img_size,
+#                  preprocess=False,grayscale=False):
+#     files_list=sorted(os.listdir(files_path))
+#     n,img_array=len(files_list),[]
+#     for i in range(n):
+#         if i%round(.1*n)==0:
+#             print('=>',end='',flush=True)
+#         img_path=files_path+files_list[i]
+#         if preprocess:
+#             img=tkimg.load_img(
+#                 img_path,grayscale=grayscale)
+#             img=tkimg.img_to_array(img)
+#             img=tkimg.smart_resize(
+#                 img,(img_size,img_size))
+#         else:
+#             img=tkimg.load_img(
+#                 img_path,target_size=(img_size,img_size))
+#             img=tkimg.img_to_array(img)
+#         img=np.expand_dims(img,axis=0)/255
+#         img_array.append(img)
+#     return np.array(np.vstack(img_array),
+#                     dtype='float32')
+# 
+# def labels2array(files_path):
+#     files_list=sorted(os.listdir(files_path))
+#     files_split=np.array([el.split('_') 
+#                           for el in files_list])
+#     num_labels=files_split.shape[1]-1
+#     labels=[files_split[:,i] 
+#             for i in range(num_labels)]
+#     labels=np.array(labels).astype('int32')
+#     for i in range(num_labels):
+#         label_set=list(set(labels[i]))
+#         replace_dict=\
+#         dict(zip(label_set,
+#                  list(range(len(label_set)))))
+#         labels[i]=[replace_dict.get(x,x) 
+#                    for x in labels[i]]
+#     return labels
+# 
+# def get_data(files_path,img_size,names1,names2,
+#              preprocess=False,grayscale=False):
+#     images=images2array(files_path,img_size,
+#                         preprocess,grayscale)
+#     labels=labels2array(files_path)
+#     n=len(labels[0][labels[0]==0])
+#     images=images[:n]; labels=labels[1][:n]
+#     cond1=np.where([l in names2[0] for l in names1[1]])[0]
+#     cond2=np.where([l in cond1 for l in labels])[0]
+#     images=images[cond2]; labels=labels[cond2]
+#     rd=dict(zip([names1[1].index(names2[0][i])
+#                  for i in range(10)],range(10)))
+#     labels=[rd.get(el,el) for el in labels]
+#     labels=np.array(labels,dtype='int32')
+#     return images,labels
+# 
+# def get_cifar():
+#     (images,labels),(_,_)=cifar10.load_data()
+#     images=np.array(images,dtype='float32')/255
+#     labels=np.array(labels,dtype='int32').reshape(-1)
+#     return images,labels
+# 
+# def data2nnarrays(images,labels,num,cmap,names=names2):
+#     N=num; n=int(.1*N)
+#     shuffle_ids=np.arange(images.shape[0])
+#     np.random.RandomState(12).shuffle(shuffle_ids)
+#     shuffle_ids=shuffle_ids[:N]
+#     images=images[shuffle_ids]
+#     labels=labels[shuffle_ids]
+#     x_test,x_valid,x_train=\
+#     images[:n],images[n:2*n],images[2*n:]
+#     y_test,y_valid,y_train=\
+#     labels[:n],labels[n:2*n],labels[2*n:]
+#     print('data outputs: ')
+#     df=pd.DataFrame([[x_train.shape,x_valid.shape,x_test.shape],
+#                      [x_train.dtype,x_valid.dtype,x_test.dtype],
+#                      [y_train.shape,y_valid.shape,y_test.shape],
+#                      [y_train.dtype,y_valid.dtype,y_test.dtype]],
+#                     columns=['train','valid','test'],
+#                     index=['image shape','image type',
+#                            'label shape','label type'])
+#     display(df)
+#     print('distribution of labels: ')
+#     df=pd.DataFrame(labels,columns=['label'])
+#     df['name']=[names[0][l] for l in labels]
+#     fig=pl.figure(figsize=(10,5))    
+#     ax=fig.add_subplot(1,1,1)
+#     sn.countplot(x='name',data=df,
+#                  palette=cmap,alpha=.5,ax=ax)
+#     pl.show()       
+#     return x_train,x_valid,x_test,\
+#            y_train,y_valid,y_test
+# 
+# def display_images(images,labels,n,names=names2):
+#     fig=pl.figure(figsize=(10,n//2))
+#     randch=np.random.choice(
+#         images.shape[0],size=n,replace=False)
+#     for i,idx in enumerate(randch):
+#         ax=fig.add_subplot(
+#             n//5,5,i+1,xticks=[],yticks=[])
+#         ax.imshow(images[idx])
+#         label=labels[idx]
+#         name=names[0][label]
+#         ax.set_title('{} => {}'\
+#                      .format(str(label),str(name)),
+#                      fontsize=10)
+#     pl.show()
+#     
+# def img_resize(x,img_size=img_size2):       
+#     x=tf.image.resize(x,[img_size,img_size])
+#     return x.numpy()
+# 
+# def get_resized_data(data):
+#     [rx_train,rx_valid,rx_test]=\
+#     [img_resize(el) for el in data[:3]]
+#     [y_train,y_valid,y_test]=data[3:]
+#     print([rx_train.shape,rx_train.dtype])
+#     print('Label: ',names2[0][y_valid[100]])
+#     pl.figure(figsize=(1,1))
+#     pl.xticks([]); pl.yticks([])
+#     pl.imshow(rx_valid[100]); pl.show()
+#     return rx_train,rx_valid,rx_test,\
+#            y_train,y_valid,y_test
+# 
+# def get_mixed_data(data1,data2):
+#     data=[np.vstack([data1[i],data2[i]])
+#           for i in range(3)]+\
+#          [np.hstack([data1[i+3],data2[i+3]])
+#           for i in range(3)]
+#     [x_train,x_valid,x_test,
+#      y_train,y_valid,y_test]=data
+#     for [x,y] in [[x_train,y_train],
+#                   [x_valid,y_valid],
+#                   [x_test,y_test]]:
+#         N=len(y); shuffle_ids=np.arange(N)
+#         np.random.RandomState(23).shuffle(shuffle_ids)
+#         x,y=x[shuffle_ids],y[shuffle_ids]
+#     return x_train,x_valid,x_test,\
+#            y_train,y_valid,y_test
+# 
+# def cnn_model(data):
+#     [x_train,x_valid,x_test,
+#      y_train,y_valid,y_test]=data
+#         
+#     model=Sequential()
+#     model.add(tkl.Conv2D(32,(5,5),padding='same',
+#                          input_shape=x_train.shape[1:]))
+#     model.add(tkl.Activation('relu'))
+#     model.add(tkl.MaxPooling2D(pool_size=(2,2)))
+#     model.add(tkl.Dropout(.25))
+#     model.add(tkl.Conv2D(196,(5,5)))
+#     model.add(tkl.Activation('relu'))    
+#     model.add(tkl.MaxPooling2D(pool_size=(2,2)))
+#     model.add(tkl.Dropout(.25))
+#     model.add(tkl.GlobalAveragePooling2D())    
+#     model.add(tkl.Dense(1024,activation='relu'))
+#     model.add(tkl.Dropout(.5))         
+#     model.add(tkl.Dense(10))
+#     model.add(tkl.Activation('softmax'))
+#     model.compile(loss='sparse_categorical_crossentropy',
+#                   optimizer='adam',metrics=['accuracy'])
+#     early_stopping=tkc.EarlyStopping(monitor='val_loss',
+#                                      patience=20,verbose=2)
+#     checkpointer=tkc.ModelCheckpoint(filepath=fw,verbose=2,
+#                                      save_best_only=True)
+#     lr_reduction=tkc.ReduceLROnPlateau(monitor='val_loss',verbose=2,
+#                                        patience=5,factor=.8)
+#     history=model.fit(x_train,y_train,epochs=100,
+#                       batch_size=64,verbose=2,
+#                       validation_data=(x_valid,y_valid),
+#                       callbacks=[checkpointer,
+#                                  early_stopping,
+#                                  lr_reduction])
+#     return model,history
+# 
+# def hub_model(data):
+#     [rx_train,rx_valid,rx_test,
+#      ry_train,ry_valid,ry_test]=data
+#     handle_base="mobilenet_v2_050_96"
+#     mhandle="https://tfhub.dev/google/imagenet/{}/feature_vector/4"\
+#     .format(handle_base)
+#     
+#     model=tf.keras.Sequential([
+#         tf.keras.layers.Input((img_size2,img_size2,3),
+#                               name='input'),
+#         th.KerasLayer(mhandle,trainable=True),
+#         tf.keras.layers.Flatten(),
+#         tf.keras.layers.Dense(2048,activation='relu'),
+#         tf.keras.layers.Dropout(rate=.5),
+#         tf.keras.layers.Dense(10,activation='softmax')])
+#     model.compile(optimizer='adam',metrics=['accuracy'],
+#                   loss='sparse_categorical_crossentropy') 
+#     early_stopping=tkc.EarlyStopping(monitor='val_loss',
+#                                      patience=20,verbose=2)
+#     checkpointer=tkc.ModelCheckpoint(filepath=fw,verbose=2,
+#                                      save_best_only=True)
+#     lr_reduction=tkc.ReduceLROnPlateau(monitor='val_loss',verbose=2,
+#                                        patience=5,factor=.8)
+#     history=model.fit(rx_train,ry_train,epochs=50,
+#                       batch_size=64,verbose=2,
+#                       validation_data=(rx_valid,ry_valid),
+#                       callbacks=[checkpointer,
+#                                  early_stopping,
+#                                  lr_reduction])
+#     return model,history
+# 
+# def history_plot(fit_history,fig_size,color):
+#     pl.style.use('seaborn-whitegrid')
+#     keys=list(fit_history.history.keys())
+#     list_history=[fit_history.history[keys[i]] 
+#                   for i in range(len(keys))]
+#     dfkeys=pd.DataFrame(list_history).T
+#     dfkeys.columns=keys
+#     fig=pl.figure(figsize=(fig_size,fig_size))
+#     ax1=fig.add_subplot(311)
+#     dfkeys.iloc[:,[0,2]].plot(
+#         ax=ax1,color=['slategray',color])
+#     ax2=fig.add_subplot(312)
+#     dfkeys.iloc[:,4].plot(ax=ax2,color=color)
+#     pl.legend()
+#     ax3=fig.add_subplot(313)
+#     dfkeys.iloc[:,[1,3]].plot(
+#         ax=ax3,color=['slategray',color])
+#     pl.show();
 
-import os,numpy as np,pandas as pd
-import pylab as pl,seaborn as sn,tensorflow as tf
-from tensorflow.keras.datasets import cifar10
-from tensorflow.keras.preprocessing import image as kimg
-from tqdm import tqdm
-from IPython.core.magic import register_line_magic
-import tensorflow_hub as th
-from tensorflow.keras.models import Sequential
-from tensorflow.keras import layers as tkl
-from tensorflow.keras import callbacks as tkc
-from PIL import ImageFile
+dhtml('Data Loading & Preprocessing')
 
-ImageFile.LOAD_TRUNCATED_IMAGES=True
-img_size,img_size2=32,96
-classes=['plane','car','bird','cat','deer',
-         'dog','frog','horse','ship','truck']
-manners=['pictogram','contour','sketch']
-objects=['flower','bird','butterfly','tree',
-         'plane','crane','dog','horse',
-         'deer','truck','car','cat',
-         'frog','ship','fish','house']
-fpath='../input/art-pictogram/pictograms/'
-flist=sorted(os.listdir(fpath))
-fw='weights.best.hdf5'
-history,model=[],[]
-x_train,rx_train,y_train,\
-x_test,rx_test,y_test,\
-x_valid,rx_valid,y_valid=\
-[],[],[],[],[],[],[],[],[]
-
-def img_resize(x):
-    global img_size2        
-    x=tf.image.resize(x,[img_size2,img_size2])
-    return x.numpy()
-
-dhtml('NN Models')
-
-@register_line_magic
-def cnn_model(n):
-    global history,model,img_size,\
-    x_train,y_train,x_test,y_test,x_valid,y_valid
-    if n=='1': 
-        x_train,y_train=x_train1,y_train1
-        x_valid,y_valid=x_valid1,y_valid1
-    if n=='2': 
-        x_train,y_train=x_train2,y_train2
-        x_valid,y_valid=x_valid2,y_valid2
-    model=Sequential()
-    model.add(tkl.Conv2D(32,(5,5),padding='same',
-                         input_shape=x_train.shape[1:]))
-    model.add(tkl.Activation('relu'))
-    model.add(tkl.MaxPooling2D(pool_size=(2,2)))
-    model.add(tkl.Dropout(.25))
-    model.add(tkl.Conv2D(196,(5,5)))
-    model.add(tkl.Activation('relu'))    
-    model.add(tkl.MaxPooling2D(pool_size=(2,2)))
-    model.add(tkl.Dropout(.25))
-    model.add(tkl.GlobalAveragePooling2D())    
-    model.add(tkl.Dense(1024,activation='relu'))
-    model.add(tkl.Dropout(.5))         
-    model.add(tkl.Dense(10))
-    model.add(tkl.Activation('softmax'))
-    model.compile(loss='sparse_categorical_crossentropy',
-                  optimizer='adam',metrics=['accuracy'])
-    early_stopping=tkc.EarlyStopping(monitor='val_loss',
-                                     patience=20,verbose=2)
-    checkpointer=tkc.ModelCheckpoint(filepath=fw,verbose=2,
-                                     save_best_only=True)
-    lr_reduction=tkc.ReduceLROnPlateau(monitor='val_loss',verbose=2,
-                                       patience=5,factor=.8)
-    history=model.fit(x_train,y_train,epochs=100,
-                      batch_size=64,verbose=2,
-                      validation_data=(x_valid,y_valid),
-                      callbacks=[checkpointer,
-                                 early_stopping,
-                                 lr_reduction])
-
-@register_line_magic
-def hub_model(n):
-    global history,model,img_size2,\
-    rx_train,y_train,rx_test,y_test,rx_valid,y_valid
-    if n=='1': 
-        rx_train,y_train=rx_train1,y_train1
-        rx_valid,y_valid=rx_valid1,y_valid1
-    if n=='2': 
-        rx_train,y_train=rx_train2,y_train2
-        rx_valid,y_valid=rx_valid2,y_valid2
-    handle_base="mobilenet_v2_050_96"
-    mhandle="https://tfhub.dev/google/imagenet/{}/feature_vector/4"\
-    .format(handle_base)
-    model=tf.keras.Sequential([
-        tf.keras.layers.Input((img_size2,img_size2,3),
-                              name='input'),
-        th.KerasLayer(mhandle,trainable=True),
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(2048,activation='relu'),
-        tf.keras.layers.Dropout(rate=.5),
-        tf.keras.layers.Dense(10,activation='softmax')])
-    model.compile(optimizer='adam',metrics=['accuracy'],
-                  loss='sparse_categorical_crossentropy') 
-    early_stopping=tkc.EarlyStopping(monitor='val_loss',
-                                     patience=20,verbose=2)
-    checkpointer=tkc.ModelCheckpoint(filepath=fw,verbose=2,
-                                     save_best_only=True)
-    lr_reduction=tkc.ReduceLROnPlateau(monitor='val_loss',verbose=2,
-                                       patience=5,factor=.8)
-    history=model.fit(rx_train,y_train,epochs=50,
-                      batch_size=64,verbose=2,
-                      validation_data=(rx_valid,y_valid),
-                      callbacks=[checkpointer,
-                                 early_stopping,
-                                 lr_reduction])
-
-def history_plot(fit_history):
-    pl.figure(figsize=(10,10)); pl.subplot(211)
-    keys=list(fit_history.history.keys())[0:4]
-    pl.plot(fit_history.history[keys[0]],
-            color='slategray',label='train')
-    pl.plot(fit_history.history[keys[2]],
-            color='#ee6611',label='valid')
-    pl.xlabel("Epochs"); pl.ylabel("Loss")
-    pl.legend(); pl.grid()
-    pl.title('Loss Function')     
-    pl.subplot(212)
-    pl.plot(fit_history.history[keys[1]],
-            color='slategray',label='train')
-    pl.plot(fit_history.history[keys[3]],
-            color='#ee6611',label='valid')
-    pl.xlabel("Epochs"); pl.ylabel("Accuracy")    
-    pl.legend(); pl.grid()
-    pl.title('Accuracy'); pl.show()
+# Commented out IPython magic to ensure Python compatibility.
+# %run pictogram_photo_classify.py
 
 dhtml('Pictogram Data')
 
-def path_to_tensor(img_path,fpath):
-    img=kimg.load_img(fpath+img_path,
-                      target_size=(img_size,img_size))
-    x=kimg.img_to_array(img)
-    return np.expand_dims(x,axis=0)
-def paths_to_tensor(img_paths,fpath):
-    tensor_list=[path_to_tensor(img_path,fpath) 
-                 for img_path in tqdm(img_paths)]
-    return np.vstack(tensor_list)
-labels1=np.array([int(el[:2]) for el in flist],
-                 dtype='int8')-1
-labels2=np.array([int(el[3:6]) for el in flist],
-                 dtype='int8')-1
-images=np.array(paths_to_tensor(flist,fpath=fpath))/255
-n2=len(labels1[labels1==0])
-images=images[:n2]; labels2=labels2[:n2]
-cond=np.where([l in classes for l in objects])[0]
-cond2=np.where([l in cond for l in labels2])
-x=images[cond2]; y=labels2[cond2]
-rd={1:2,4:0,6:5,7:7,8:4,9:9,10:1,11:3,12:6,13:8}
-y=np.array([rd.get(el,el) for el in y],
-            dtype='int8')
-N=len(y); n=int(.1*N)
-shuffle_ids=np.arange(N)
-np.random.RandomState(123).shuffle(shuffle_ids)
-x,y=x[shuffle_ids],y[shuffle_ids]
-x_test1,x_valid1,x_train1=x[:n],x[n:2*n],x[2*n:]
-y_test1,y_valid1,y_train1=y[:n],y[n:2*n],y[2*n:]
+files_path1='../input/art-pictogram/'+\
+            'pictograms/'
 
-print([x.shape,x.dtype,y.shape,y.dtype])
-print('Label: ',classes[y[100]])
-pl.figure(figsize=(1,1))
-pl.xticks([]); pl.yticks([])
-pl.imshow(x[100]);
+images1,labels1=\
+get_data(files_path1,img_size1,names1,names2,
+         preprocess=False,grayscale=False)
 
-# Commented out IPython magic to ensure Python compatibility.
-# %cnn_model 1
+num1=images1.shape[0]; num1
 
-history_plot(history)
+x_train1,x_valid1,x_test1,\
+y_train1,y_valid1,y_test1=\
+data2nnarrays(images1,labels1,num1,cmap1)
+
+display_images(x_train1,y_train1,15)
+
+dhtml('CIFAR Data')
+
+images2,labels2=get_cifar()
+
+x_train2,x_valid2,x_test2,\
+y_train2,y_valid2,y_test2=\
+data2nnarrays(images2,labels2,num1,cmap2)
+
+display_images(x_train2,y_train2,15)
+
+dhtml('Resized Data')
+
+rx_train1,rx_test1,rx_valid1,\
+ry_train1,ry_valid1,ry_test1=\
+get_resized_data([x_train1,x_test1,x_valid1,
+                  y_train1,y_valid1,y_test1])
+
+rx_train2,rx_test2,rx_valid2,\
+ry_train2,ry_valid2,ry_test2=\
+get_resized_data([x_train2,x_test2,x_valid2,
+                  y_train2,y_valid2,y_test2])
+
+dhtml('Mixed Data')
+
+x_train0,x_test0,x_valid0,\
+y_train0,y_valid0,y_test0=\
+get_mixed_data([x_train1,x_test1,x_valid1,
+                y_train1,y_valid1,y_test1],
+               [x_train2,x_test2,x_valid2,
+                y_train2,y_valid2,y_test2])
+
+display_images(x_train0,y_train0,15)
+
+rx_train0,rx_test0,rx_valid0,\
+ry_train0,ry_valid0,ry_test0=\
+get_mixed_data([rx_train1,rx_test1,rx_valid1,
+                ry_train1,ry_valid1,ry_test1],
+               [rx_train2,rx_test2,rx_valid2,
+                ry_train2,ry_valid2,ry_test2])
+
+display_images(rx_train0,ry_train0,15)
+
+dhtml('Data Dictionary')
+
+data_dict=\
+{'0':[x_train0,x_valid0,x_test0,
+      y_train0,y_valid0,y_test0],
+ '1':[x_train1,x_valid1,x_test1,
+      y_train1,y_valid1,y_test1],
+ '2':[x_train2,x_valid2,x_test2,
+      y_train2,y_valid2,y_test2],
+ 'r0':[rx_train0,rx_valid0,rx_test0,
+      ry_train0,ry_valid0,ry_test0],
+ 'r1':[rx_train1,rx_valid1,rx_test1,
+      ry_train1,ry_valid1,ry_test1],
+ 'r2':[rx_train2,rx_valid2,rx_test2,
+      ry_train2,ry_valid2,ry_test2]}
+[el.shape for el in data_dict['r2']]
+
+dhtml('NN Models')
+dhtml('Pictogram Data')
+
+model,history=cnn_model(data_dict['1'])
+
+history_plot(history,7,c1)
 
 model.load_weights(fw)
 model.evaluate(x_test1,y_test1)
 
-rx_train1,rx_test1,rx_valid1=\
-img_resize(x_train1),img_resize(x_test1),img_resize(x_valid1)
-print([rx_train1.shape,rx_train1.dtype])
-print('Label: ',classes[y_valid1[100]])
-pl.figure(figsize=(1,1))
-pl.xticks([]); pl.yticks([])
-pl.imshow(rx_valid1[100]);
+model,history=hub_model(data_dict['r1'])
 
-# Commented out IPython magic to ensure Python compatibility.
-# %hub_model 1
-
-history_plot(history)
+history_plot(history,7,c1)
 
 model.load_weights(fw)
-model.evaluate(rx_test1,y_test1)
+model.evaluate(rx_test1,ry_test1)
 
 dhtml('CIFAR Data')
 
-(x,y),(_,_)=cifar10.load_data()
-x2=np.array(x,dtype='float32')/255
-y2=y.reshape(-1)
-N2=len(y2); n2=int(.1*N2)
-shuffle_ids2=np.arange(N2)
-np.random.RandomState(234).shuffle(shuffle_ids2)
-shuffle_ids2=shuffle_ids2[:N]
-x2,y2=x2[shuffle_ids2],y2[shuffle_ids2]
-x_test2,x_valid2,x_train2=x2[:n],x2[n:2*n],x2[2*n:]
-y_test2,y_valid2,y_train2=y2[:n],y2[n:2*n],y2[2*n:]
+model,history=cnn_model(data_dict['2'])
 
-print([x2.shape,x2.dtype,y2.shape,y2.dtype])
-print('Label: ',classes[y2[100]])
-pl.figure(figsize=(1,1))
-pl.xticks([]); pl.yticks([])
-pl.imshow(x2[100]);
-
-# Commented out IPython magic to ensure Python compatibility.
-# %cnn_model 2
-
-history_plot(history)
+history_plot(history,7,c1)
 
 model.load_weights(fw)
 model.evaluate(x_test2,y_test2)
 
-rx_train2,rx_test2,rx_valid2=\
-img_resize(x_train2),img_resize(x_test2),img_resize(x_valid2)
-print([x_train2.shape,x_train2.dtype])
-print('Label: ',classes[y_valid2[100]])
-pl.figure(figsize=(1,1))
-pl.xticks([]); pl.yticks([])
-pl.imshow(x_valid2[100]);
+model,history=hub_model(data_dict['r2'])
 
-# Commented out IPython magic to ensure Python compatibility.
-# %hub_model 2
-
-history_plot(history)
+history_plot(history,7,c1)
 
 model.load_weights(fw)
-model.evaluate(rx_test2,y_test2)
+model.evaluate(rx_test2,ry_test2)
 
 dhtml('Mixed Data')
 
-x_train=np.vstack([x_train1,x_train2])
-x_test=np.vstack([x_test1,x_test2])
-x_valid=np.vstack([x_valid1,x_valid2])
-y_train=np.hstack([y_train1,y_train2])
-y_test=np.hstack([y_test1,y_test2])
-y_valid=np.hstack([y_valid1,y_valid2])
-for [x,y] in [[x_train,y_train],
-              [x_test,y_test],
-              [x_valid,y_valid]]:
-    N=len(y); shuffle_ids=np.arange(N)
-    np.random.RandomState(23).shuffle(shuffle_ids)
-    x,y=x[shuffle_ids],y[shuffle_ids]
-    print([x.shape,x.dtype,y.shape,y.dtype])
+model,history=cnn_model(data_dict['0'])
 
-fig=pl.figure(figsize=(10,3))
-randch=np.random.choice(x_test.shape[0],
-                        size=10,replace=False)
-for i,idx in enumerate(randch):
-    ax=fig.add_subplot(2,5,i+1,
-                       xticks=[],yticks=[])
-    ax.imshow(x_test[idx])
-    true_idx=y_test[idx]
-    ax.set_title(classes[true_idx],color="#ee6611")
-
-# Commented out IPython magic to ensure Python compatibility.
-# %cnn_model 0
-
-history_plot(history)
+history_plot(history,7,c1)
 
 model.load_weights(fw)
-model.evaluate(x_test,y_test)
+model.evaluate(x_test0,y_test0)
 
-rx_train=np.vstack([rx_train1,rx_train2])
-rx_test=np.vstack([rx_test1,rx_test2])
-rx_valid=np.vstack([rx_valid1,rx_valid2])
-y_train=np.hstack([y_train1,y_train2])
-y_test=np.hstack([y_test1,y_test2])
-y_valid=np.hstack([y_valid1,y_valid2])
-for [x,y] in [[rx_train,y_train],
-              [rx_test,y_test],
-              [rx_valid,y_valid]]:
-    N=len(y); shuffle_ids=np.arange(N)
-    np.random.RandomState(23).shuffle(shuffle_ids)
-    x,y=x[shuffle_ids],y[shuffle_ids]
-    print([x.shape,x.dtype,y.shape,y.dtype])
+model,history=hub_model(data_dict['r0'])
 
-fig=pl.figure(figsize=(10,3))
-randch=np.random.choice(rx_test.shape[0],
-                        size=10,replace=False)
-for i,idx in enumerate(randch):
-    ax=fig.add_subplot(2,5,i+1,
-                       xticks=[],yticks=[])
-    ax.imshow(rx_test[idx])
-    true_idx=y_test[idx]
-    ax.set_title(classes[true_idx],color="#ee6611")
-
-# Commented out IPython magic to ensure Python compatibility.
-# %hub_model 0
-
-history_plot(history)
+history_plot(history,7,c1)
 
 model.load_weights(fw)
-model.evaluate(rx_test,y_test)
+model.evaluate(rx_test0,ry_test0)
