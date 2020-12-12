@@ -10,151 +10,193 @@ Original file is located at
 ## Code Modules & Functions
 """
 
-!pip install --upgrade neural_structured_learning --user
+!pip install --upgrade pip \
+--user --quiet --no-warn-script-location
+!pip install --upgrade neural_structured_learning \
+--user --quiet --no-warn-script-location
 
 import warnings; warnings.filterwarnings('ignore')
 import pandas as pd,numpy as np
 import tensorflow_hub as th,tensorflow as tf
 import neural_structured_learning as nsl
-import os,pylab as pl
-from keras.preprocessing import image as kimage
-from tqdm import tqdm
-from PIL import ImageFile
-ImageFile.LOAD_TRUNCATED_IMAGES=True 
-fpath='../input/tomato-cultivars/'
+import h5py,os,pandas as pd,numpy as np
+import seaborn as sn,pylab as pl
+import tensorflow.keras.callbacks as tkc,\
+tensorflow.keras.utils as tku,tensorflow.keras.layers as tkl
+import tensorflow.keras.preprocessing.image as tkimg
 
-def path_to_tensor(img_path,fpath=fpath):
-    img=kimage.load_img(fpath+img_path, 
-                        target_size=(160,160))
-    x=kimage.img_to_array(img)
-    return np.expand_dims(x,axis=0)
-def paths_to_tensor(img_paths):
-    tensor_list=[path_to_tensor(img_path) 
-                 for img_path in tqdm(img_paths)]
-    return np.vstack(tensor_list)
+def images2array(files_path,img_size,
+                 preprocess=False,grayscale=False):
+    files_list=sorted(os.listdir(files_path))
+    n,img_array=len(files_list),[]
+    for i in range(n):
+        if i%round(.1*n)==0:
+            print('=>',end='',flush=True)
+        img_path=files_path+files_list[i]
+        if preprocess:
+            img=tkimg.load_img(
+                img_path,grayscale=grayscale)
+            img=tkimg.img_to_array(img)
+            img=tkimg.smart_resize(
+                img,(img_size,img_size))
+        else:
+            img=tkimg.load_img(
+                img_path,target_size=(img_size,img_size))
+            img=tkimg.img_to_array(img)
+        img=np.expand_dims(img,axis=0)/255
+        img_array.append(img)
+    return np.array(np.vstack(img_array),
+                    dtype='float32')
+def labels2array(files_path):
+    files_list=sorted(os.listdir(files_path))
+    files_split=np.array([el.split('_') 
+                          for el in files_list])
+    num_labels=files_split.shape[1]-1
+    labels=[files_split[:,i] 
+            for i in range(num_labels)]
+    labels=np.array(labels).astype('int32')
+    for i in range(num_labels):
+        label_set=list(set(labels[i]))
+        replace_dict=\
+        dict(zip(label_set,
+                 list(range(len(label_set)))))
+        labels[i]=[replace_dict.get(x,x) 
+                   for x in labels[i]]
+    return labels
 
 """## Data"""
 
-names=['Kumato','Beefsteak','Tigerella',
-       'Roma','Japanese Black Trifele',
-       'Yellow Pear','Sun Gold','Green Zebra',
-       'Cherokee Purple','Oxheart','Blue Berries',
-       'San Marzano','Banana Legs',
-       'German Orange Strawberry','Supersweet 100']
-flist=sorted(os.listdir(fpath))
-labels=np.array([int(el[:2]) for el in flist],
-               dtype='float32')-1
-images=np.array(paths_to_tensor(flist),
-                dtype='float32')/255
-N=labels.shape[0]; n=int(.1*N)
+files_path='../input/tomato-cultivars/'
+img_size=160
+names=[['Kumato','Beefsteak','Tigerella',
+        'Roma','Japanese Black Trifele',
+        'Yellow Pear','Sun Gold','Green Zebra',
+        'Cherokee Purple','Oxheart','Blue Berries',
+        'San Marzano','Banana Legs',
+        'German Orange Strawberry','Supersweet 100']]
+images=images2array(files_path,img_size)
+labels=labels2array(files_path)
+N=images.shape[0]; n=int(.1*N)
 shuffle_ids=np.arange(N)
 np.random.RandomState(12).shuffle(shuffle_ids)
-images,labels=images[shuffle_ids],labels[shuffle_ids]
-x_test,x_valid,x_train=images[:n],images[n:2*n],images[2*n:]
-y_test,y_valid,y_train=labels[:n],labels[n:2*n],labels[2*n:]
+images=images[shuffle_ids]
+labels=np.array([labels[i][shuffle_ids]
+                 for i in range(labels.shape[0])])
+x_test,x_valid,x_train=\
+images[:n],images[n:2*n],images[2*n:]
+y_test,y_valid,y_train=\
+labels[:,:n],labels[:,n:2*n],labels[:,2*n:]
 
-set(labels)
+df=pd.DataFrame(
+    [[x_train.shape,x_valid.shape,x_test.shape],
+     [x_train.dtype,x_valid.dtype,x_test.dtype],
+     [y_train.shape,y_valid.shape,y_test.shape],
+     [y_train.dtype,y_valid.dtype,y_test.dtype]],
+    columns=['train','valid','test'],
+    index=['image shape','image type',
+           'label shape','label type'])
+df
 
-pd.DataFrame([[x_train.shape,x_valid.shape,x_test.shape],
-              [x_train.dtype,x_valid.dtype,x_test.dtype],
-              [y_train.shape,y_valid.shape,y_test.shape],
-              [y_train.dtype,y_valid.dtype,y_test.dtype]],               
-             columns=['train','valid','test'])
-
-k=np.random.randint(40)
-print('Label: ',y_test[k],
-      names[int(y_test[k])])
-pl.figure(figsize=(3,3))
-pl.imshow((x_test[k]));
+cmap='tab20'
+idx=['labels %d'%(i+1) for i in range(labels.shape[0])]
+df=pd.DataFrame(labels,index=idx).T
+for i in range(labels.shape[0]):
+    df['name %d'%(i+1)]=\
+    [names[i][l] for l in labels[i]]
+fig=pl.figure(figsize=(9,3))    
+for i in range(labels.shape[0]):
+    ax=fig.add_subplot(labels.shape[0],1,i+1)
+    sn.countplot(y='name %s'%(i+1),data=df,
+                 palette=cmap,alpha=.5,ax=ax)
+pl.show()
 
 """## NN Examples"""
 
-fw='weights.best.hdf5'
 def premodel(pix,den,mh,lbl,activ,loss):
     model=tf.keras.Sequential([
-        tf.keras.layers.Input((pix,pix,3),
-                              name='input'),
+        tkl.Input((pix,pix,int(3)),name='input'),
         th.KerasLayer(mh,trainable=True),
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(den,activation='relu'),
-        tf.keras.layers.Dropout(rate=.5),
-        tf.keras.layers.Dense(lbl,activation=activ)])
-    model.compile(optimizer='adam',
-                  metrics=['accuracy'],loss=loss)
-    display(model.summary())
+        tkl.Flatten(),
+        tkl.Dense(den,activation='relu'),
+        tkl.Dropout(rate=.5),
+        tkl.Dense(lbl,activation=activ)])
+    model.compile(optimizer='adam',metrics=['accuracy'],loss=loss)
     return model
 def cb(fw):
-    early_stopping=tf.keras.callbacks\
-    .EarlyStopping(monitor='val_loss',patience=20,verbose=2)
-    checkpointer=tf.keras.callbacks\
-    .ModelCheckpoint(filepath=fw,save_best_only=True,verbose=2)
-    lr_reduction=tf.keras.callbacks\
-    .ReduceLROnPlateau(monitor='val_loss',verbose=2,
-                       patience=5,factor=.8)
+    early_stopping=tkc.EarlyStopping(
+        monitor='val_loss',patience=int(20),verbose=int(2))
+    checkpointer=tkc.ModelCheckpoint(
+        filepath=fw,verbose=int(2),save_weights_only=True,
+        monitor='val_accuracy',mode='max',save_best_only=True)
+    lr_reduction=tkc.ReduceLROnPlateau(
+        monitor='val_loss',verbose=int(2),patience=int(5),factor=.8)
     return [checkpointer,early_stopping,lr_reduction]
 
-[handle_base,pixels]=["inception_v3",160]
-mhandle="https://tfhub.dev/google/imagenet/{}/classification/4"\
+fw='/tmp/checkpoint'
+[handle_base,pixels]=['inception_v3',160]
+mhandle='https://tfhub.dev/google/imagenet/{}/classification/4'\
 .format(handle_base)
 
-model=premodel(pixels,1024,mhandle,15,
-               'softmax','sparse_categorical_crossentropy')
-history=model.fit(x=x_train,y=y_train,batch_size=32,
-                  epochs=70,callbacks=cb(fw),
-                  validation_data=(x_valid,y_valid))
+model=premodel(pixels,1024,mhandle,15,'softmax',
+               'sparse_categorical_crossentropy')
+history=model.fit(
+    x=x_train,y=np.squeeze(y_train),
+    batch_size=32,epochs=70,callbacks=cb(fw),
+    validation_data=(x_valid,np.squeeze(y_valid)))
 
 model.load_weights(fw)
-model.evaluate(x_test,y_test)
+model.evaluate(x_test,np.squeeze(y_test))
 
-[handle_base,pixels]=["mobilenet_v2_100_160",160]
-mhandle="https://tfhub.dev/google/imagenet/{}/classification/4"\
+[handle_base,pixels]=['mobilenet_v2_100_160',160]
+mhandle='https://tfhub.dev/google/imagenet/{}/classification/4'\
 .format(handle_base)
 
-model=premodel(pixels,1024,mhandle,15,
-               'softmax','sparse_categorical_crossentropy')
-history=model.fit(x=x_train,y=y_train,batch_size=32,
-                  epochs=70,callbacks=cb(fw),
-                  validation_data=(x_valid,y_valid))
+model=premodel(pixels,1024,mhandle,15,'softmax',
+               'sparse_categorical_crossentropy')
+history=model.fit(
+    x=x_train,y=np.squeeze(y_train),
+    batch_size=32,epochs=70,callbacks=cb(fw),
+    validation_data=(x_valid,np.squeeze(y_valid)))
 
 model.load_weights(fw)
-model.evaluate(x_test,y_test)
+model.evaluate(x_test,np.squeeze(y_test))
 
 batch_size=64; img_size=x_train.shape[1]; epochs=30
 base_model=tf.keras.Sequential([
-    tf.keras.Input((img_size,img_size,3),name='input'),
-    tf.keras.layers.Conv2D(32,(5,5),padding='same'),
-    tf.keras.layers.Activation('relu'),
-    tf.keras.layers.MaxPooling2D(pool_size=(2,2)),
-    tf.keras.layers.Dropout(.25),
-    tf.keras.layers.Conv2D(196,(5,5)),
-    tf.keras.layers.Activation('relu'),    
-    tf.keras.layers.MaxPooling2D(pool_size=(2,2)),
-    tf.keras.layers.Dropout(.25),
-    tf.keras.layers.GlobalMaxPooling2D(),    
-    tf.keras.layers.Dense(512),
-    tf.keras.layers.Activation('relu'),
-    tf.keras.layers.Dropout(.25),
-    tf.keras.layers.Dense(128),
-    tf.keras.layers.Activation('relu'),
-    tf.keras.layers.Dropout(.25),
-    tf.keras.layers.Dense(15,activation='softmax')
-])
+    tkl.Input((img_size,img_size,3),name='input'),
+    tkl.Conv2D(32,(5,5),padding='same'),
+    tkl.Activation('relu'),
+    tkl.MaxPooling2D(pool_size=(2,2)),
+    tkl.Dropout(.25),
+    tkl.Conv2D(196,(5,5)),
+    tkl.Activation('relu'),    
+    tkl.MaxPooling2D(pool_size=(2,2)),
+    tkl.Dropout(.25),
+    tkl.GlobalMaxPooling2D(),    
+    tkl.Dense(512),
+    tkl.Activation('relu'),
+    tkl.Dropout(.25),
+    tkl.Dense(128),
+    tkl.Activation('relu'),
+    tkl.Dropout(.25),
+    tkl.Dense(15,activation='softmax')])
 adv_config=nsl.configs\
 .make_adv_reg_config(multiplier=.2,adv_step_size=.05)
 adv_model=nsl.keras\
 .AdversarialRegularization(base_model,adv_config=adv_config)
-adv_model.compile(optimizer='adam',
-                  loss='sparse_categorical_crossentropy',
-                  metrics=['accuracy'])
+adv_model.compile(
+    optimizer='adam',metrics=['accuracy'],
+    loss='sparse_categorical_crossentropy')
 
 train=tf.data.Dataset.from_tensor_slices(
-    {'input':x_train,'label':y_train})\
+    {'input':x_train,'label':np.squeeze(y_train)})\
      .batch(batch_size)
 valid=tf.data.Dataset.from_tensor_slices(
-    {'input':x_valid,'label':y_valid})\
+    {'input':x_valid,'label':np.squeeze(y_valid)})\
      .batch(batch_size)
 valid_steps=x_valid.shape[0]//batch_size
 adv_model.fit(train,validation_data=valid,verbose=2,
               validation_steps=valid_steps,epochs=epochs)
 
-adv_model.evaluate({'input':x_test,'label':y_test})
+adv_model.evaluate(
+    {'input':x_test,'label':np.squeeze(y_test)})
