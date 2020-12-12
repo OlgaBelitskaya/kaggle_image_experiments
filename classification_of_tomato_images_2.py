@@ -16,13 +16,12 @@ Original file is located at
 --user --quiet --no-warn-script-location
 
 import warnings; warnings.filterwarnings('ignore')
-import pandas as pd,numpy as np
 import tensorflow_hub as th,tensorflow as tf
 import neural_structured_learning as nsl
-import h5py,os,pandas as pd,numpy as np
+import os,pandas as pd,numpy as np
 import seaborn as sn,pylab as pl
 import tensorflow.keras.callbacks as tkc,\
-tensorflow.keras.utils as tku,tensorflow.keras.layers as tkl
+tensorflow.keras.layers as tkl
 import tensorflow.keras.preprocessing.image as tkimg
 
 def images2array(files_path,img_size,
