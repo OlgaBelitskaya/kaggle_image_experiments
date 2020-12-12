@@ -9,42 +9,59 @@ Original file is located at
 ## Code Modules & Functions
 """
 
+import sys
+!cp ../input/rapids/rapids.0.16.0 /opt/conda/envs/rapids.tar.gz
+!cd /opt/conda/envs/ && tar -xzvf rapids.tar.gz > /dev/null
+sys.path=["/opt/conda/envs/rapids/lib/python3.7/site-packages"]+sys.path
+sys.path=["/opt/conda/envs/rapids/lib/python3.7"]+sys.path
+sys.path=["/opt/conda/envs/rapids/lib"]+sys.path 
+!cp /opt/conda/envs/rapids/lib/libxgboost.so /opt/conda/lib/
+
 import warnings; warnings.filterwarnings('ignore')
 import pandas as pd,numpy as np,tensorflow as tf
-import os,pylab as pl
+import os,pylab as pl,cudf,cuml
 from sklearn.metrics import accuracy_score,hamming_loss
 from sklearn.metrics import classification_report
-from sklearn.ensemble import RandomForestClassifier as RFC
+from sklearn.ensemble import RandomForestClassifier as sRFC
+from cuml.ensemble import RandomForestClassifier as cRFC
 from sklearn import svm
-from sklearn.neighbors import KNeighborsClassifier as KNC
+from sklearn.neighbors import KNeighborsClassifier as sKNC
+from cuml.neighbors import KNeighborsClassifier as cKNC
 from sklearn.neural_network import MLPClassifier
-from keras.preprocessing import image as kimage
-from tqdm import tqdm
-from PIL import ImageFile
-ImageFile.LOAD_TRUNCATED_IMAGES=True 
+import tensorflow.keras.preprocessing.image as tkimg
 fpath='../input/tomato-cultivars/'
 
-def path_to_tensor(img_path,fpath=fpath):
-    img=kimage.load_img(fpath+img_path, 
-                        target_size=(160,160))
-    x=kimage.img_to_array(img)
-    return np.expand_dims(x,axis=0)
-def paths_to_tensor(img_paths):
-    tensor_list=[path_to_tensor(img_path) 
-                 for img_path in tqdm(img_paths)]
-    return np.vstack(tensor_list)
+def images2array(files_path,img_size,grayscale=False):
+    files_list=sorted(os.listdir(files_path))
+    n,img_array=len(files_list),[]
+    for i in range(n):
+        if i%round(.1*n)==0:
+            print('=>',end='',flush=True)
+        img_path=files_path+files_list[i]
+        if grayscale:
+            img=tkimg.load_img(
+                img_path,grayscale=grayscale)
+        else:
+            img=tkimg.load_img(
+                img_path,target_size=(img_size,img_size))
+        img=tkimg.img_to_array(img)
+        img=np.expand_dims(img,axis=0)/255
+        img_array.append(img)
+    return np.array(np.vstack(img_array),dtype='float32')
 
 """## Data"""
 
 names=['Kumato','Beefsteak','Tigerella',
        'Roma','Japanese Black Trifele',
        'Yellow Pear','Sun Gold','Green Zebra',
-       'Cherokee Purple','Oxheart','Blue Berries']
+       'Cherokee Purple','Oxheart','Blue Berries',
+       'San Marzano','Banana Legs',
+       'German Orange Strawberry','Supersweet 100']
 flist=sorted(os.listdir(fpath))
-labels=np.array([int(el[:2]) for el in flist],
-               dtype='int32')-1
-images=np.array(paths_to_tensor(flist),
-                dtype='float32')/255
+labels=np.array(
+    [int(el[:2]) for el in flist],dtype='int32')-1
+img_size=160
+images=images2array(fpath,img_size)
 N=labels.shape[0]; n=int(.2*N)
 shuffle_ids=np.arange(N)
 np.random.RandomState(12).shuffle(shuffle_ids)
@@ -64,9 +81,9 @@ print('Label: ',y_test[k],
 pl.figure(figsize=(3,3))
 pl.imshow((x_test[k]));
 
-x_train=x_train.reshape(-1,160*160*3)
+x_train=x_train.reshape(-1,img_size**2*3)
 y_train=y_train.reshape(-1,1)
-x_test=x_test.reshape(-1,160*160*3)
+x_test=x_test.reshape(-1,img_size**2*3)
 y_test=y_test.reshape(-1,1)
 
 """## Sklearn Classifiers"""
@@ -82,10 +99,15 @@ def classifier_fit_score(classifier,x_train,x_test,y_train,y_test):
     return [y_clf_train,y_clf_test,acc_clf_train,acc_clf_test,
             loss_clf_train,loss_clf_test]
 
-[y_rfc_train,y_rfc_test,acc_rfc_train,
- acc_rfc_test,loss_rfc_train,loss_rfc_test]=\
-classifier_fit_score(RFC(),x_train,x_test,y_train,y_test)
-print(classification_report(y_test,y_rfc_test))
+[y_srfc_train,y_srfc_test,acc_srfc_train,
+ acc_srfc_test,loss_srfc_train,loss_srfc_test]=\
+classifier_fit_score(sRFC(),x_train,x_test,y_train,y_test)
+print(classification_report(y_test,y_srfc_test))
+
+#[y_crfc_train,y_crfc_test,acc_crfc_train,
+# acc_crfc_test,loss_crfc_train,loss_crfc_test]=\
+#classifier_fit_score(cRFC(),x_train,x_test,y_train,y_test)
+#print(classification_report(y_test,y_crfc_test))
 
 [y_lsvc_train,y_lsvc_test,acc_lsvc_train,
  acc_lsvc_test,loss_lsvc_train,loss_lsvc_test]=\
@@ -96,7 +118,7 @@ print(classification_report(y_test,y_lsvc_test))
 pl.figure(figsize=(10,5)); t=50; x=range(t)
 pl.scatter(x,y_test[:t],marker='*',s=400,
            color='#ff355e',label='Real data')
-pl.scatter(x,y_rfc_test[:t],marker='v',
+pl.scatter(x,y_srfc_test[:t],marker='v',
            s=100,color='darkorange',label='Random Forest')
 pl.scatter(x,y_lsvc_test[:t],marker='s',s=50,
            color='darkred',label='SVM LinearSVC')
@@ -104,10 +126,15 @@ pl.xlabel('Observations'); pl.ylabel('Targets')
 pl.title('Classifiers. Test Results')
 pl.legend(loc=2,fontsize=10); pl.show()
 
-[y_knc_train,y_knc_test,acc_knc_train,
- acc_knc_test,loss_knc_train,loss_knc_test]=\
-classifier_fit_score(KNC(),x_train,x_test,y_train,y_test)
-print(classification_report(y_test,y_knc_test))
+[y_sknc_train,y_sknc_test,acc_sknc_train,
+ acc_sknc_test,loss_sknc_train,loss_sknc_test]=\
+classifier_fit_score(sKNC(),x_train,x_test,y_train,y_test)
+print(classification_report(y_test,y_sknc_test))
+
+[y_cknc_train,y_cknc_test,acc_cknc_train,
+ acc_cknc_test,loss_cknc_train,loss_cknc_test]=\
+classifier_fit_score(cKNC(),x_train,x_test,y_train,y_test)
+print(classification_report(y_test,y_cknc_test))
 
 mlpc=MLPClassifier(hidden_layer_sizes=(512,),
                    max_iter=60,solver='sgd',
@@ -122,7 +149,7 @@ print(classification_report(y_test,y_mlpc_test))
 pl.figure(figsize=(10,5)); t=50; x=range(t)
 pl.scatter(x,y_test[:t],marker='*',s=400,
            color='#ff355e',label='Real data')
-pl.scatter(x,y_knc_test[:t],marker='v',
+pl.scatter(x,y_sknc_test[:t],marker='v',
            s=100,color='darkorange',label='KNeighbors')
 pl.scatter(x,y_mlpc_test[:t],marker='s',s=50,
            color='darkred',label='MLP')
@@ -130,14 +157,14 @@ pl.xlabel('Observations'); pl.ylabel('Targets')
 pl.title('Classifiers. Test Results')
 pl.legend(loc=2,fontsize=10); pl.show()
 
-acc_train=[acc_rfc_train,acc_lsvc_train,
-           acc_knc_train,acc_mlpc_train]
-acc_test=[acc_rfc_test,acc_lsvc_test,
-          acc_knc_test,acc_mlpc_test]
-loss_train=[loss_rfc_train,loss_lsvc_train,
-            loss_knc_train,loss_mlpc_train]
-loss_test=[loss_rfc_test,loss_lsvc_test,
-           loss_knc_test,loss_mlpc_test]
+acc_train=[acc_srfc_train,acc_lsvc_train,
+           acc_sknc_train,acc_mlpc_train]
+acc_test=[acc_srfc_test,acc_lsvc_test,
+          acc_sknc_test,acc_mlpc_test]
+loss_train=[loss_srfc_train,loss_lsvc_train,
+            loss_sknc_train,loss_mlpc_train]
+loss_test=[loss_srfc_test,loss_lsvc_test,
+           loss_sknc_test,loss_mlpc_test]
 cols=['Random Forest','SVM LinearSVC',
       'KNeighbors','MLP']
 pd.DataFrame([acc_train,acc_test,
