@@ -227,7 +227,7 @@ def cb(fw):
     early_stopping=tkc.EarlyStopping(
         monitor='val_loss',patience=20,verbose=2)
     checkpointer=tkc.ModelCheckpoint(
-        filepath=fweights,save_best_only=True,verbose=2,
+        filepath=fw,save_best_only=True,verbose=2,
         save_weights_only=True,monitor='val_accuracy',mode='max')
     lr_reduction=tkc.ReduceLROnPlateau(
         monitor='val_loss',verbose=2,patience=5,factor=.8)
