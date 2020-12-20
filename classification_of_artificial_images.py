@@ -12,14 +12,16 @@ Original file is located at
 # %run ../input/python-recipes/keras_history_plot.py
 dhtml('Code Modules & Settings','#00ff66',f3,fs7)
 
-!pip install mplcyberpunk
-
+!python3 -m pip install --upgrade pip \
+--user --quiet --no-warn-script-location
+!pip install mplcyberpunk --user --quiet
 import os,h5py,seaborn as sn,pylab as pl
 import pandas as pd,numpy as np,tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras import layers as tkl
 from tensorflow.keras import callbacks as tkc
-fpath='../input/arrays-of-artificial-images/'
+files_path='../input/arrays-of-artificial-images/'
+model_weights='/checkpoints'
 
 dhtml('Functions','#00ff66',f3,fs7)
 
@@ -47,7 +49,7 @@ def randcoord(a,b,c):
     return fx,fy
 
 def randcol():
-    return [np.random.random(3)]
+    return [.9-.8*np.random.random(3)]
 
 def checkplot(n):
     global images,labels,targets
@@ -61,18 +63,16 @@ def checkplot(n):
     ax=fig.add_subplot(122)
     ax.imshow(images[n])
     ax.set_axis_off()
-    pl.show()
+    pl.tight_layout(); pl.show()
 
 def cb(fw):
-    early_stopping=tkc\
-    .EarlyStopping(monitor='val_loss',
-                   patience=20,verbose=2)
-    checkpointer=tkc\
-    .ModelCheckpoint(filepath=fw,verbose=2,
-                     save_best_only=True)
-    lr_reduction=tkc\
-    .ReduceLROnPlateau(monitor='val_loss',verbose=2,
-                       patience=5,factor=.8)
+    early_stopping=tkc.EarlyStopping(
+        monitor='val_loss',patience=20,verbose=2)
+    checkpointer=tkc.ModelCheckpoint(
+        filepath=fw,save_best_only=True,verbose=2,
+        save_weights_only=True,monitor='val_accuracy',mode='max')
+    lr_reduction=tkc.ReduceLROnPlateau(
+        monitor='val_loss',verbose=2,patience=7,factor=.8)
     return [checkpointer,early_stopping,lr_reduction]
 
 def module_exists(module_name):
@@ -83,7 +83,7 @@ def module_exists(module_name):
     else:
         return True
     
-def glow_history_plot(fit_history,fig_size=10,
+def glow_history_plot(fit_history,fig_size=8,
                       col1='#00ff66',col2='#6600ff'):
     if module_exists('mplcyberpunk'):
         import mplcyberpunk
@@ -111,12 +111,13 @@ def glow_history_plot(fit_history,fig_size=10,
             color=col1,label='lr')
     pl.xlabel('epochs'); pl.ylabel(keys[4])    
     pl.legend(); pl.title('learning rate')
-    mplcyberpunk.add_glow_effects(); pl.show()
+    mplcyberpunk.add_glow_effects()
+    pl.tight_layout(); pl.show()
 
 dhtml('Data','#00ff66',f3,fs7)
 
 fn='ArtificialImages01.h5'
-with h5py.File(fpath+fn,'r') as f:
+with h5py.File(files_path+fn,'r') as f:
     keys=list(f.keys()); print(keys)
     images=np.array(f[keys[0]])
     labels=np.array(f[keys[1]])
@@ -128,7 +129,7 @@ filenames=['ArtificialImages%02d'%(i+2)+'.h5'
            for i in range(19)]
 for fn in filenames:
     print(fn)
-    with h5py.File(fpath+fn,'r') as f:
+    with h5py.File(files_path+fn,'r') as f:
         keys=list(f.keys())
         addimages=np.array(f[keys[0]])
         addlabels=np.array(f[keys[1]])
@@ -140,15 +141,13 @@ for fn in filenames:
     targets=np.vstack([targets,addtargets])
 labels=labels.reshape(-1)
 img_size=images.shape[1]
-images.shape,labels.shape,targets.shape
 
 n=np.random.randint(labels.shape[0])
 checkplot(n)
+images.shape,labels.shape,targets.shape
 
-classes=list(set(labels))
-num_classes=len(classes)
-rd=dict(zip(classes,
-            list(range(len(classes)))))
+classes=list(set(labels)); num_classes=len(classes)
+rd=dict(zip(classes,list(range(len(classes)))))
 labels=np.array([rd.get(x,x) for x in labels],
                 dtype=np.int32)
 rd,classes,list(set(labels))
@@ -168,11 +167,10 @@ targets[:n],targets[n:2*n],targets[2*n:]
 
 df=pd.DataFrame(labels,columns=['label'])
 df['class']=[classes[l] for l in labels]
-pl.figure(figsize=(7,5))
-sn.countplot(x='class',data=df,
-             palette='winter',alpha=.5)
+pl.figure(figsize=(8,4))
+sn.countplot(x='class',data=df,palette='winter',alpha=.5)
 ti='Label Distribution'
-pl.title(ti,fontsize=16);
+pl.title(ti,fontsize=20,color='#00ff66');
 
 dhtml('Classification','#00ff66',f3,fs7)
 
@@ -182,12 +180,10 @@ dhtml('Classification','#00ff66',f3,fs7)
 base_conv2d=32; last_pool='avg'
 cnn_model=base_cnn_model(
     base_conv2d,last_pool,num_classes,img_size)
-fw='weights.best.hdf5'
 history=cnn_model\
-.fit(x_train,y_train,epochs=200,
-     batch_size=64,verbose=2,
-     validation_data=(x_valid,y_valid),
-     callbacks=cb(fw))
+.fit(x_train,y_train,epochs=200,batch_size=64,
+     verbose=2,validation_data=(x_valid,y_valid),
+     callbacks=cb(model_weights))
 
 glow_history_plot(history)
 
@@ -196,5 +192,5 @@ keras_history_plot(history,start=50,end=200)
 df_history=pandas_history(history,True)
 df_history.head()
 
-cnn_model.load_weights(fw)
-cnn_model.evaluate(x_test,y_test)
+cnn_model.load_weights(model_weights)
+cnn_model.evaluate(x_test,y_test,verbose=0)
