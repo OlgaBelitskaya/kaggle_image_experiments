@@ -17,28 +17,32 @@ from six.moves.urllib.request import urlopen
 import tensorflow as tf,tensorflow_hub as hub
 tf.get_logger().setLevel('ERROR')
 
+!python -m pip install --upgrade pip --user --quiet
 !git clone --depth 1 https://github.com/tensorflow/models --quiet
 
 # Commented out IPython magic to ensure Python compatibility.
 # %%bash
-# sudo apt install -y protobuf-compiler --quiet
+# pip install protobuf-compiler --user --quiet
 # cd models/research/
 # protoc object_detection/protos/*.proto --python_out=.
 # cp object_detection/packages/tf2/setup.py .
-# python -m pip install . --quiet
+# python -m pip install . --user --quiet
+
+spath='root/.local/bin'
+import sys; sys.path.append(spath)
 
 """## ✒️ Models"""
 
 from object_detection.utils import \
 label_map_util,ops as utils_ops,\
 visualization_utils as viz_utils
-PATH_TO_LABELS='./models/research/object_detection/'+\
-               'data/mscoco_label_map.pbtxt'
+label_map='./models/research/object_detection/'+\
+          'data/mscoco_label_map.pbtxt'
 category_index=label_map_util\
 .create_category_index_from_labelmap(
-    PATH_TO_LABELS,use_display_name=True)
+    label_map,use_display_name=True)
 
-ALL_MODELS={
+all_models={
 'CenterNet HourGlass104 512x512':
     'https://tfhub.dev/tensorflow/centernet/hourglass_512x512/1',
 'CenterNet HourGlass104 Keypoints 512x512':
@@ -119,10 +123,9 @@ ALL_MODELS={
     'https://tfhub.dev/tensorflow/mask_rcnn/inception_resnet_v2_1024x1024/1'}
 
 model_display_name='CenterNet HourGlass104 1024x1024'
-#'CenterNet Resnet50 V2 Keypoints 512x512'
-model_handle=ALL_MODELS[model_display_name]
-print('Selected model:'+model_display_name)
-print('Model Handle at TensorFlow Hub: {}'.format(model_handle))
+model_handle=all_models[model_display_name]
+print('selected model: %s'%model_display_name)
+print('model handle at TensorFlow Hub: %s'%model_handle)
 print('loading model...')
 hub_model=hub.load(model_handle)
 print('model loaded!')
@@ -131,18 +134,18 @@ print('model loaded!')
 
 # Commented out IPython magic to ensure Python compatibility.
 def load_image_into_numpy_array(path):
-    image=None
-    if(path.startswith('http')):
+    img=None
+    if (path.startswith('http')):
         response=urlopen(path)
-        image_data=response.read()
-        image_data=BytesIO(image_data)
-        image=Image.open(image_data)
+        img_data=response.read()
+        img_data=BytesIO(img_data)
+        img=Image.open(img_data)
     else:
-        image_data=tf.io.gfile.GFile(path,'rb').read()
-        image=Image.open(BytesIO(image_data))
-    (im_width,im_height)=image.size
-    return np.array(image.getdata()).reshape(
-        (1,im_height,im_width,3)).astype(np.uint8)
+        img_data=tf.io.gfile.GFile(path,'rb').read()
+        img=Image.open(BytesIO(img_data))
+    (img_width,img_height)=img.size
+    return np.array(img.getdata()).reshape(
+        (1,img_height,img_width,3)).astype(np.uint8)
 # %matplotlib inline
 
 COCO17_HUMAN_POSE_KEYPOINTS=\
@@ -153,13 +156,16 @@ COCO17_HUMAN_POSE_KEYPOINTS=\
 file_path='https://olgabelitskaya.gitlab.io/images/'
 images_dict={
     'squirrel':file_path+'01_024.png',
-    'night lights':file_path+'01_026.png',
+    'urban lights':file_path+'01_026.png',
     'ducks':file_path+'01_027.png',
     'science lesson':file_path+'01_028.png',
-    'insects':file_path+'01_029.png'
+    'butterflies':file_path+'01_030.png',
+    'insects':file_path+'01_031.png',
+    'illuminations':file_path+'01_033.png',
+    'dusk':file_path+'01_035.png'
 }
 
-selected_img='ducks'
+selected_img='dusk'
 flip_image_horizontally=False
 convert_image_to_grayscale=False
 rotate_image_90=0
@@ -203,14 +209,16 @@ viz_utils.visualize_boxes_and_labels_on_image_array(
       keypoints=keypoints,
       keypoint_scores=keypoint_scores,
       keypoint_edges=COCO17_HUMAN_POSE_KEYPOINTS)
-pl.figure(figsize=(8,12))
+pl.figure(figsize=(10,14))
 pl.imshow(img_np_detections[0])
 pl.tight_layout(); pl.show()
 
 img_np_mask=img_np.copy()
 if 'detection_masks' in result:
-    detection_masks=tf.convert_to_tensor(result['detection_masks'][0])
-    detection_boxes=tf.convert_to_tensor(result['detection_boxes'][0])
+    detection_masks=tf.convert_to_tensor(
+        result['detection_masks'][0])
+    detection_boxes=tf.convert_to_tensor(
+        result['detection_boxes'][0])
     detection_masks_reframed=\
     utils_ops.reframe_box_masks_to_image_masks(
         detection_masks, detection_boxes,
@@ -221,7 +229,8 @@ if 'detection_masks' in result:
 viz_utils.visualize_boxes_and_labels_on_image_array(
       img_np_mask[0],
       result['detection_boxes'][0],
-      (result['detection_classes'][0]+label_id_offset).astype(int),
+      (result['detection_classes'][0]+\
+       label_id_offset).astype(int),
       result['detection_scores'][0],
       category_index,
       use_normalized_coordinates=True,
@@ -230,6 +239,6 @@ viz_utils.visualize_boxes_and_labels_on_image_array(
       agnostic_mode=False,
       instance_masks=result.get('detection_masks_reframed',None),
       line_thickness=5)
-pl.figure(figsize=(8,12))
+pl.figure(figsize=(10,14))
 pl.imshow(img_np_mask[0])
 pl.tight_layout(); pl.show()
