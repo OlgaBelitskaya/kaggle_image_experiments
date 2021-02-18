@@ -16,41 +16,39 @@ def dhtml(str):
     style='font-family:Smokum; color:#ff33aa; font-size:35px;'>
 #     %s</h1>"""%str))
 
-!pip install --upgrade neural_structured_learning --user
+!pip install --upgrade pip --user --quiet --no-warn-script-location
+!pip install --upgrade neural_structured_learning --user --quiet
 
 dhtml('Code Modules & Settings')
 
 import os,numpy as np,pandas as pd
 import pylab as pl,seaborn as sn,tensorflow as tf
-from tensorflow.keras.datasets import cifar10
-from tensorflow.keras.preprocessing import image as kimg
 from tqdm import tqdm
+from tensorflow.keras.datasets import cifar10
+from tensorflow.keras.preprocessing import image as tkimg
 from tensorflow.keras.models import Sequential
 from tensorflow.keras import layers as tkl
 from tensorflow.keras import callbacks as tkc
 import neural_structured_learning as nsl
-from PIL import ImageFile
-ImageFile.LOAD_TRUNCATED_IMAGES=True
 
 dhtml('Mixed Data')
 
-n1=1100
 classes=['plane','car','bird','cat','deer',
          'dog','frog','horse','ship','truck']
 (x,y),(_,_)=cifar10.load_data()
 x=np.array(x,dtype='float32')/255
 y=y.reshape(-1)
-N=len(y); n=int(.1*N)
+n_photo=1200; N=len(y); n=int(.1*N)
 shuffle_ids=np.arange(N)
 np.random.RandomState(23).shuffle(shuffle_ids)
-shuffle_ids=shuffle_ids[:n1]
+shuffle_ids=shuffle_ids[:n_photo]
 x,y=x[shuffle_ids],y[shuffle_ids]
 
 print([x.shape,x.dtype,y.shape,y.dtype])
 print('Label: ',classes[y[1]])
-pl.figure(figsize=(1,1))
+pl.figure(figsize=(2,2))
 pl.xticks([]); pl.yticks([])
-pl.imshow(x[1]);
+pl.tight_layout(); pl.imshow(x[1]);
 
 img_size=32
 manners=['pictogram','contour','sketch']
@@ -58,40 +56,40 @@ objects=['flower','bird','butterfly','tree',
          'plane','crane','dog','horse',
          'deer','truck','car','cat',
          'frog','ship','fish','house']
-fpath='../input/art-pictogram/pictograms/'
-flist=sorted(os.listdir(fpath))
-def path_to_tensor(img_path,fpath):
-    img=kimg.load_img(fpath+img_path,
-                      target_size=(img_size,img_size))
-    x=kimg.img_to_array(img)
-    return np.expand_dims(x,axis=0)
-def paths_to_tensor(img_paths,fpath):
-    tensor_list=[path_to_tensor(img_path,fpath) 
-                 for img_path in tqdm(img_paths)]
-    return np.vstack(tensor_list)
-labels1=np.array([int(el[:2]) for el in flist],
-                 dtype='int8')-1
-labels2=np.array([int(el[3:6]) for el in flist],
-                 dtype='int8')-1
-images=np.array(paths_to_tensor(flist,fpath=fpath))/255
-n2=len(labels1[labels1==0])
-images=images[:n2]; labels2=labels2[:n2]
+file_path='../input/art-pictogram/pictograms/'
+file_list=sorted(os.listdir(file_path))
+def paths2tensor(img_paths,file_path=file_path,
+                 img_size=img_size):
+    tensor=[]
+    for img_path in tqdm(img_paths):
+        img0=tkimg.load_img(
+            file_path+img_path,
+            target_size=(img_size,img_size))
+        img=tkimg.img_to_array(img0)
+        tensor.append(np.expand_dims(img,axis=0))
+    return np.vstack(tensor)
+labels1=np.array([int(el[:2]) for el in file_list],
+                 dtype='int16')-1
+labels2=np.array([int(el[3:6]) for el in file_list],
+                 dtype='int16')-1
+images=np.array(paths2tensor(file_list))/255
+n_draw=len(labels1[labels1==0])
+images=images[:n_draw]; labels2=labels2[:n_draw]
 cond=np.where([l in classes for l in objects])[0]
 cond2=np.where([l in cond for l in labels2])
 images=images[cond2]; labels=labels2[cond2]
 rd={1:2,4:0,6:5,7:7,8:4,9:9,10:1,11:3,12:6,13:8}
 labels=np.array([rd.get(x,x) for x in labels],
-                dtype='int8')
+                dtype='int16')
 
 print([images.shape,images.dtype,
        labels.shape,labels.dtype])
 print('Label: ',classes[labels[100]])
-pl.figure(figsize=(1,1))
+pl.figure(figsize=(2,2))
 pl.xticks([]); pl.yticks([])
-pl.imshow(images[100]);
+pl.tight_layout(); pl.imshow(images[100]);
 
-x=np.vstack([x,images])
-y=np.hstack([y,labels])
+x=np.vstack([x,images]); y=np.hstack([y,labels])
 N=len(y); n=int(.1*N)
 shuffle_ids=np.arange(N)
 np.random.RandomState(23).shuffle(shuffle_ids)
@@ -100,23 +98,22 @@ x_test,x_valid,x_train=x[:n],x[n:2*n],x[2*n:]
 y_test,y_valid,y_train=y[:n],y[n:2*n],y[2*n:]
 print([x.shape,x.dtype,y.shape,y.dtype])
 
-fig=pl.figure(figsize=(10,3))
-randch=np.random.choice(x_test.shape[0],
-                        size=10,replace=False)
-for i,idx in enumerate(randch):
-    ax=fig.add_subplot(2,5,i+1,
-                       xticks=[],yticks=[])
+fig=pl.figure(figsize=(8,4))
+randi=np.random.choice(
+    x_test.shape[0],size=10,replace=False)
+for i,idx in enumerate(randi):
+    ax=fig.add_subplot(2,5,i+1,xticks=[],yticks=[])
     ax.imshow(x_test[idx])
     true_idx=y_test[idx]
     ax.set_title(classes[true_idx],color="#ff33aa")
+    pl.tight_layout();
 
 df=pd.DataFrame(y,columns=['label'])
 df['class']=[classes[l] for l in y]
-pl.figure(figsize=(7,5))
-sn.countplot(y='class',data=df,
-             palette='Reds',alpha=.5)
-ti='Label Distribution'
-pl.title(ti,fontsize=20); pl.legend(loc=4);
+pl.figure(figsize=(8,4))
+sn.countplot(x='class',data=df,palette='Reds',alpha=.5)
+pl.title('distribution of labels',fontsize=20)
+pl.tight_layout();
 
 dhtml('NN Examples')
 
@@ -141,43 +138,42 @@ def cnn_model():
     model.compile(loss='sparse_categorical_crossentropy',
                   optimizer='adam',metrics=['accuracy'])
     return model
-
 cnn_model=cnn_model()
-fw='weights.best.hdf5'
-early_stopping=tkc.EarlyStopping(monitor='val_loss',
-                                 patience=20,verbose=2)
-checkpointer=tkc.ModelCheckpoint(filepath=fw,verbose=2,
-                                 save_best_only=True)
-lr_reduction=tkc.ReduceLROnPlateau(monitor='val_loss',verbose=2,
-                                   patience=5,factor=.8)
-history=cnn_model.fit(x_train,y_train,epochs=100,
-                      batch_size=64,verbose=2,
-                      validation_data=(x_valid,y_valid),
-                      callbacks=[checkpointer,
-                                 early_stopping,
-                                 lr_reduction])
+
+model_weights='/tmp/checkpoint'
+early_stopping=tkc.EarlyStopping(
+    monitor='val_loss',patience=20,verbose=2)
+checkpointer=tkc.ModelCheckpoint(
+    filepath=model_weights,verbose=2,save_weights_only=True,
+    monitor='val_accuracy',mode='max',save_best_only=True)
+lr_reduction=tkc.ReduceLROnPlateau(
+    monitor='val_loss',verbose=2,patience=5,factor=.8)
+history=cnn_model.fit(
+    x_train,y_train,epochs=100,batch_size=64,verbose=2,
+    validation_data=(x_valid,y_valid),
+    callbacks=[checkpointer,early_stopping,lr_reduction])
 
 def history_plot(fit_history):
-    pl.figure(figsize=(10,10)); pl.subplot(211)
+    pl.figure(figsize=(8,4)); pl.subplot(211)
     keys=list(fit_history.history.keys())[0:4]
     pl.plot(fit_history.history[keys[0]],
             color='slategray',label='train')
     pl.plot(fit_history.history[keys[2]],
             color='#ff33aa',label='valid')
-    pl.xlabel("Epochs"); pl.ylabel("Loss")
+    pl.xlabel('epochs'); pl.ylabel('loss')
     pl.legend(); pl.grid()
-    pl.title('Loss Function')     
+    pl.title('loss function')     
     pl.subplot(212)
     pl.plot(fit_history.history[keys[1]],
             color='slategray',label='train')
     pl.plot(fit_history.history[keys[3]],
             color='#ff33aa',label='valid')
-    pl.xlabel("Epochs"); pl.ylabel("Accuracy")    
+    pl.xlabel('epochs'); pl.ylabel('accuracy')    
     pl.legend(); pl.grid()
-    pl.title('Accuracy'); pl.show()
+    pl.title('accuracy'); pl.show()
 history_plot(history)
 
-cnn_model.load_weights(fw)
+cnn_model.load_weights(model_weights)
 cnn_model.evaluate(x_test,y_test)
 
 batch_size=64; img_size=32; n_classes=10; epochs=30
