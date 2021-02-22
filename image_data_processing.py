@@ -179,31 +179,34 @@ class ESPCNCallback(tf.keras.callbacks.Callback):
         super(ESPCNCallback,self).__init__()
         self.test_img=low_resolution_img(
             load_img(test_paths[0]),upscale_factor)
+        self.mean_psnr=[]
     def on_epoch_begin(self,epoch,logs=None):
         self.psnr=[]
     def on_epoch_end(self,epoch,logs=None):
         print('mean PSNR for epoch: %.2f'%(np.mean(self.psnr)))
-        if epoch%25==0:
+        if epoch%50==0:
             prediction=upscale_img(self.model,self.test_img)
             display_results(
                 prediction,'epoch-'+str(epoch),'prediction')
+        self.mean_psnr.append(np.mean(self.psnr))
     def on_test_batch_end(self,batch,logs=None):
         self.psnr.append(10*math.log10(1/logs['loss']))
 
-early_stopping=tkc.EarlyStopping(monitor='loss',verbose=2,patience=10)
+early_stopping=tkc.EarlyStopping(
+    monitor='loss',verbose=2,patience=20)
 checkpoint_path='/tmp/checkpoint'
 checkpoint=tkc.ModelCheckpoint(
     filepath=checkpoint_path,save_weights_only=True,
     monitor='loss',mode='min',save_best_only=True,verbose=2)
 lr_reduction=tkc.ReduceLROnPlateau(
-    monitor='val_loss',patience=10,verbose=2,factor=.9)
+    monitor='val_loss',patience=10,verbose=2,factor=.95)
 
 model=model(upscale_factor=upscale_factor,channels=1)
 callbacks=[ESPCNCallback(),early_stopping,checkpoint,lr_reduction]
 loss_fn=tf.keras.losses.MeanSquaredError()
-optimizer=tf.keras.optimizers.Adam(learning_rate=.0005)
+optimizer=tf.keras.optimizers.Adam(learning_rate=.001)
 
-epochs=300
+epochs=1000
 model.compile(optimizer=optimizer,loss=loss_fn,)
 history=model.fit(
     train_ds,epochs=epochs,callbacks=callbacks,
@@ -213,7 +216,10 @@ model.load_weights(checkpoint_path);
 history_keys=list(history.history.keys())
 pl.figure(figsize=(10,3))
 pl.plot(history.history[history_keys[1]])
-pl.grid(); pl.title(history_keys[1]);
+pl.grid(); pl.title(history_keys[1]); pl.show()
+pl.figure(figsize=(10,3))
+pl.plot(callbacks[0].mean_psnr)
+pl.grid(); pl.title('mean psnr'); pl.show()
 
 # Commented out IPython magic to ensure Python compatibility.
 total_bicubic_psnr=0.; total_test_psnr=0.; n_img=10
