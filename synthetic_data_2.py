@@ -27,8 +27,7 @@ from tqdm import tqdm
 from tensorflow.keras.datasets import cifar10
 from tensorflow.keras.preprocessing import image as tkimg
 from tensorflow.keras.models import Sequential
-from tensorflow.keras import layers as tkl
-from tensorflow.keras import callbacks as tkc
+from tensorflow.keras import layers as tkl,callbacks as tkc
 import neural_structured_learning as nsl
 
 dhtml('Mixed Data')
@@ -63,15 +62,12 @@ def paths2tensor(img_paths,file_path=file_path,
     tensor=[]
     for img_path in tqdm(img_paths):
         img0=tkimg.load_img(
-            file_path+img_path,
-            target_size=(img_size,img_size))
+            file_path+img_path,target_size=(img_size,img_size))
         img=tkimg.img_to_array(img0)
         tensor.append(np.expand_dims(img,axis=0))
     return np.vstack(tensor)
-labels1=np.array([int(el[:2]) for el in file_list],
-                 dtype='int16')-1
-labels2=np.array([int(el[3:6]) for el in file_list],
-                 dtype='int16')-1
+labels1=np.array([int(el[:2]) for el in file_list],dtype='int16')-1
+labels2=np.array([int(el[3:6]) for el in file_list],dtype='int16')-1
 images=np.array(paths2tensor(file_list))/255
 n_draw=len(labels1[labels1==0])
 images=images[:n_draw]; labels2=labels2[:n_draw]
@@ -79,12 +75,11 @@ cond=np.where([l in classes for l in objects])[0]
 cond2=np.where([l in cond for l in labels2])
 images=images[cond2]; labels=labels2[cond2]
 rd={1:2,4:0,6:5,7:7,8:4,9:9,10:1,11:3,12:6,13:8}
-labels=np.array([rd.get(x,x) for x in labels],
-                dtype='int16')
+labels=np.array([rd.get(x,x) for x in labels],dtype='float32')
 
 print([images.shape,images.dtype,
        labels.shape,labels.dtype])
-print('Label: ',classes[labels[100]])
+print('Label: ',classes[int(labels[100])])
 pl.figure(figsize=(2,2))
 pl.xticks([]); pl.yticks([])
 pl.tight_layout(); pl.imshow(images[100]);
@@ -104,12 +99,12 @@ randi=np.random.choice(
 for i,idx in enumerate(randi):
     ax=fig.add_subplot(2,5,i+1,xticks=[],yticks=[])
     ax.imshow(x_test[idx])
-    true_idx=y_test[idx]
+    true_idx=int(y_test[idx])
     ax.set_title(classes[true_idx],color="#ff33aa")
     pl.tight_layout();
 
 df=pd.DataFrame(y,columns=['label'])
-df['class']=[classes[l] for l in y]
+df['class']=[classes[int(l)] for l in y]
 pl.figure(figsize=(8,4))
 sn.countplot(x='class',data=df,palette='Reds',alpha=.5)
 pl.title('distribution of labels',fontsize=20)
@@ -174,7 +169,7 @@ def history_plot(fit_history):
 history_plot(history)
 
 cnn_model.load_weights(model_weights)
-cnn_model.evaluate(x_test,y_test)
+dhtml(cnn_model.evaluate(x_test,y_test,verbose=0))
 
 batch_size=64; img_size=32; n_classes=10; epochs=30
 base_model=tf.keras.Sequential([
@@ -194,23 +189,26 @@ base_model=tf.keras.Sequential([
     tf.keras.layers.Dense(128),
     tf.keras.layers.Activation('relu'),
     tf.keras.layers.Dropout(.25),
-    tf.keras.layers.Dense(n_classes,
-                          activation='softmax')
+    tf.keras.layers.Dense(n_classes,activation='softmax')
 ])
 adv_config=nsl.configs\
 .make_adv_reg_config(multiplier=.2,adv_step_size=.05)
 adv_model=nsl.keras\
 .AdversarialRegularization(base_model,adv_config=adv_config)
-adv_model.compile(optimizer='adam',
-                  loss='sparse_categorical_crossentropy',
-                  metrics=['accuracy'])
+model_weights='/tmp/checkpoint'
+checkpointer=tkc.ModelCheckpoint(
+    filepath=model_weights,verbose=2,save_weights_only=True,
+    monitor='val_sparse_categorical_accuracy',
+    mode='max',save_best_only=True)
+adv_model.compile(optimizer='adam',metrics=['accuracy'],
+                  loss='sparse_categorical_crossentropy')
 
 train=tf.data.Dataset.from_tensor_slices(
     {'input':x_train,'label':y_train}).batch(batch_size)
 valid=tf.data.Dataset.from_tensor_slices(
     {'input':x_valid,'label':y_valid}).batch(batch_size)
 valid_steps=x_valid.shape[0]//batch_size
-adv_model.fit(train,validation_data=valid,verbose=2,
-              validation_steps=valid_steps,epochs=epochs);
+adv_model.fit(train,epochs=epochs,verbose=2,callbacks=[checkpointer],
+              validation_data=valid,validation_steps=valid_steps);
 
-adv_model.evaluate({'input':x_test,'label':y_test})
+dhtml(adv_model.evaluate({'input':x_test,'label':y_test},verbose=0))
